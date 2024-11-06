@@ -1,0 +1,15 @@
+{
+  "domain": "linak_bed_controller",
+  "name": "Linak Bed Controller",
+  "codeowners": [
+    "@jonryf"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://www.home-assistant.io/integrations/linak_bed_controller",
+  "homekit": {},
+  "iot_class": "local_polling",
+  "requirements": [],
+  "ssdp": [],
+  "zeroconf": []
+}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components import bluetooth
-from homeassistant.components.linak_bed_controller.lib.bed import Bed
+from .lib.bed import Bed
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 

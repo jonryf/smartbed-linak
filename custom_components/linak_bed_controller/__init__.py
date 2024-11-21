@@ -9,7 +9,7 @@ from bleak.exc import BleakError
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth.match import ADDRESS, BluetoothCallbackMatcher
-from homeassistant.components.linak_bed_controller.coordinator import BedCoordinator
+from .coordinator import BedCoordinator
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_NAME,

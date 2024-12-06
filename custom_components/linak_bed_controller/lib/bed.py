@@ -156,6 +156,7 @@ class Bed:
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
             return
+        self.logger.warning(f"Is connected: {self.client.is_connected}")
         
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:

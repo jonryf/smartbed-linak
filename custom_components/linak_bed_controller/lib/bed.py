@@ -89,7 +89,12 @@ class Bed:
         pass
 
     def _move_head_to(self, position):
-        while abs(self.head_position - position) > 0.1:
+        while abs(self.head_position - position) > 1.5:
+            self.logger.warning(
+                "Current head position: %s - Moving to: %s",
+                self.head_position,
+                position,
+            )
             if self.head_position < position:
                 self._head_up()
             else:

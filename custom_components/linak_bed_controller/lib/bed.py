@@ -42,6 +42,7 @@ class Bed:
         self.head_position = 0
         self.feet_position = 0
         self.light_status = False
+        self.client = None
 
     def set_ble_device(self, device):
         self.device = device

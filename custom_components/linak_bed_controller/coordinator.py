@@ -39,7 +39,8 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
         )
         if ble_device is None:
             _LOGGER.warning("No BLEDevice for %s", self._address)
-            return True
+            return False
+        self.bed.set_ble_device(ble_device)
 
         return True
 

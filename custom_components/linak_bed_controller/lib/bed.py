@@ -42,12 +42,17 @@ class Bed:
         self.head_position = 0
         self.feet_position = 0
         self.light_status = False
-        self.client = BleakClient(mac_address)
+
+    def set_ble_device(self, device):
+        self.device = device
 
     def set_flat(self):
         pass
 
     def disconnect_callback(self):
+        if self.client is None:
+            self.logger.warning("Not connected, skipping disconnect.")
+            return
         time_now = time.time()
         if (time_now - self.last_time_used) > 4:
             self.logger.info("Disconnecting from bed.")
@@ -106,17 +111,21 @@ class Bed:
         self.head_position = round(self.head_position, 2)
 
     async def _connect_bed(self):
-        while True:
+        if self.client is None:
+            self.logger.warning("BLE device not found, skipping connecting.")
+            return
+
+        while self.client.is_connected is False:
             try:
-                self.logger.info("Attempting to connect to bed.")
+                self.logger.warning("Attempting to connect to bed.")
                 await self.client.connect()
-                self.logger.info("Connected to bed.")
+                self.logger.warning("Connected to bed.")
                 self.is_connected = True
                 self._print_characteristics()
-                self.logger.info("Connected to bed.")
-                self.logger.debug("Enabling bed control.")
+                self.logger.warning("Connected to bed.")
+                self.logger.warning("Enabling bed control.")
                 self.device.readCharacteristic(0x000D)
-                self.logger.info("Bed control enabled.")
+                self.logger.warning("Bed control enabled.")
 
                 # Schedule delayed_function to run after 20 seconds
                 timer = threading.Timer(20, self.disconnect_callback)
@@ -128,15 +137,10 @@ class Bed:
             self.logger.warning("Error connecting to bed, retrying in one second.")
             await asyncio.sleep(1)
 
-    def _get_ble_connection(self):
-        """Dynamically connect to the bed on use and disconnnect after a while"""
-        self.client = BleakClient(
-            self.mac_address,
-            device=self.name,
-            disconnected_callback=self.disconnect_callback,
-        )
-
     def _write_char(self, cmd):
+        if self.client is None:
+            self.logger.warning("BLE device not found, skipping writing.")
+
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:
             self.device.writeCharacteristic(

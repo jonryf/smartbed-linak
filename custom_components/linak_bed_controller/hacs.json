@@ -1,3 +1,5 @@
 {
-    "name": "Linak Bed Controller"
+    "name": "Linak Bed Controller",
+    "content_in_root": true,
+    "zip_release": false
 }

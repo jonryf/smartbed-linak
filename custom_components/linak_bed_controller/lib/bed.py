@@ -55,6 +55,7 @@ class Bed:
 
     def set_ble_device(self, client):
         self.client =  BleakClient(self.mac_address)
+        self.client.connect()
 
 
     def set_flat(self):

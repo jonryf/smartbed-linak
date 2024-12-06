@@ -90,7 +90,7 @@ class Bed:
     async def move_head_rest_to(self, position: float):
         self.logger.info("Move head rest to %s", position)
         await self._connect_bed()
-        self._move_head_to(position)
+        await self._move_head_to(position)
 
     async def move_foot_rest_to(self, position: float):
         pass
@@ -98,7 +98,7 @@ class Bed:
     def stop(self):
         pass
 
-    def _move_head_to(self, position):
+    async def _move_head_to(self, position):
         while abs(self.head_position - position) > 1.5:
             self.logger.warning(
                 "Current head position: %s - Moving to: %s",
@@ -106,21 +106,21 @@ class Bed:
                 position,
             )
             if self.head_position < position:
-                self._head_up()
+                await self._head_up()
             else:
-                self._head_down()
+                await self._head_down()
 
-    def _head_up(self):
+    async def _head_up(self):
         """Move the head section of the bed up."""
-        self._write_char(_COMMAND_HEAD_UP)
+        await self._write_char(_COMMAND_HEAD_UP)
 
         # Update state
         self.head_position = min(100, self.head_position + self.head_increment)
         self.head_position = round(self.head_position, 2)
 
-    def _head_down(self):
+    async def _head_down(self):
         """Move the head section of the bed down."""
-        self._write_char(_COMMAND_HEAD_DOWN)
+        await self._write_char(_COMMAND_HEAD_DOWN)
 
         # Update state
         self.head_position = max(0, self.head_position - self.head_increment)
@@ -152,14 +152,14 @@ class Bed:
             self.logger.warning("Error connecting to bed, retrying in one second.")
             await asyncio.sleep(1)
 
-    def _write_char(self, cmd: bytearray):
+    async def _write_char(self, cmd: bytearray):
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
             return
         
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:
-            self.client.write_gatt_char(
+            await self.client.write_gatt_char(
                 _UUID_COMMAND,
                 cmd,
                 response=False,

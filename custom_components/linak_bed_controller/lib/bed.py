@@ -53,9 +53,10 @@ class Bed:
         self.light_status = False
         self.client = None
 
-    def set_ble_device(self, client):
+    async def set_ble_device(self, client):
         self.client =  BleakClient(self.mac_address)
-        self.client.connect()
+        await self.client.pair()
+        await self.client.connect()
 
 
     def set_flat(self):

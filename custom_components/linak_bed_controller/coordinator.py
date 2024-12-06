@@ -42,7 +42,7 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
             return False
         _LOGGER.warning("Connected (!) to %s", self._address)
 
-        self.bed.set_ble_device(ble_device)
+        await self.bed.set_ble_device(ble_device)
 
         return True
 

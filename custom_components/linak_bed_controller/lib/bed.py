@@ -17,7 +17,7 @@ class Command(Enum):
     ALL_DOWN = "0000"
     ALL_UP = "0100"
     STOP_MOVEMENT = "FF00"
-    HEAP_UP = "0B00"  # [0x0B, 0x00]
+    HEAD_UP = "0B00"  # [0x0B, 0x00]
     HEAD_DOWN = "0A00"  # [0x0A, 0x00]
     FOOT_UP = "0900"  # [0x09, 0x00]
     FOOT_DOWN = "0800"  # [0x08, 0x00]

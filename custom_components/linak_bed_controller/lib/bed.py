@@ -53,8 +53,8 @@ class Bed:
         self.light_status = False
         self.client = None
 
-    def set_ble_device(self, device):
-        self.device = device
+    def set_ble_device(self, client):
+        self.client = client
 
     def set_flat(self):
         pass
@@ -138,10 +138,6 @@ class Bed:
                 self.is_connected = True
                 self._print_characteristics()
                 self.logger.warning("Connected to bed.")
-                self.logger.warning("Enabling bed control.")
-                self.device.readCharacteristic(0x000D)
-                self.logger.warning("Bed control enabled.")
-
                 # Schedule delayed_function to run after 20 seconds
                 timer = threading.Timer(20, self.disconnect_callback)
                 timer.start()
@@ -155,7 +151,8 @@ class Bed:
     def _write_char(self, cmd: bytearray):
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
-
+            return
+        
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:
             self.client.write_gatt_char(

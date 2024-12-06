@@ -129,6 +129,9 @@ class Bed:
         if self.client is None:
             self.logger.warning("BLE device not found, skipping connecting.")
             return
+        
+        if self.client:
+            return
 
         while self.client.is_connected is False:
             try:

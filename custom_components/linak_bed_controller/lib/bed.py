@@ -10,7 +10,16 @@ from bleak import BleakClient
 
 from homeassistant.helpers.entity_platform import Logger
 
+_UUID_COMMAND: str = "99fa0002-338a-1024-8a49-009c0215f78a"
 
+_COMMAND_ALL_DOWN: bytearray = bytearray([0x00, 0x00])
+_COMMAND_ALL_UP: bytearray = bytearray([0x01, 0x00])
+_COMMAND_STOP_MOVEMENT: bytearray = bytearray([0xFF, 0x00])
+
+_COMMAND_HEAD_UP: bytearray = bytearray([0x0B, 0x00])
+_COMMAND_HEAD_DOWN: bytearray = bytearray([0x0A, 0x00])
+_COMMAND_FOOT_UP: bytearray = bytearray([0x09, 0x00])
+_COMMAND_FOOT_DOWN: bytearray = bytearray([0x08, 0x00])
 class Command(Enum):
     """Enum for bed commands."""
 
@@ -102,7 +111,7 @@ class Bed:
 
     def _head_up(self):
         """Move the head section of the bed up."""
-        self._write_char(Command.HEAD_UP.value)
+        self._write_char(_COMMAND_HEAD_UP)
 
         # Update state
         self.head_position = min(100, self.head_position + self.head_increment)
@@ -110,7 +119,7 @@ class Bed:
 
     def _head_down(self):
         """Move the head section of the bed down."""
-        self._write_char(Command.HEAD_DOWN.value)
+        self._write_char(_COMMAND_HEAD_DOWN)
 
         # Update state
         self.head_position = max(0, self.head_position - self.head_increment)
@@ -143,16 +152,16 @@ class Bed:
             self.logger.warning("Error connecting to bed, retrying in one second.")
             await asyncio.sleep(1)
 
-    def _write_char(self, cmd):
+    def _write_char(self, cmd: bytearray):
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
 
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:
-            self.device.writeCharacteristic(
-                0x000E,
-                bytes.fromhex(cmd),
-                withResponse=False,
+            self.client.write_gatt_char(
+                _UUID_COMMAND,
+                cmd,
+                response=False,
             )
         except Exception as e:
             self.logger.error(str(e))

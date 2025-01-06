@@ -36,6 +36,9 @@ class Bed:
     client: BleakClient | None
     is_connected: bool = False  # TODO: ...
     last_time_used: int = 0
+    stop_actions: bool = False
+    _lock = asyncio.Lock()
+
 
     def __init__(self, mac_address: str, device_name: str, logger: Logger):
         self.mac_address = mac_address
@@ -60,7 +63,8 @@ class Bed:
 
 
     def set_flat(self):
-        pass
+        self.set_flat_head()
+        self.set_flat_foot()
 
     def disconnect_callback(self):
         if self.client is None:
@@ -84,24 +88,50 @@ class Bed:
         await self.move_head_rest_to(100)
 
     async def set_flat_foot(self):
-        pass
+        await self.move_foot_rest_to(0)
 
     async def set_max_foot(self):
-        pass
+        await self.move_foot_rest_to(100)
 
     async def move_head_rest_to(self, position: float):
         self.logger.info("Move head rest to %s", position)
         await self._connect_bed()
-        await self._move_head_to(position)
+        
+        async with self._lock:
+            if self._disconnect_task:
+                self._disconnect_task.cancel()
+
+            await self._move_head_to(position)
+            self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
+
 
     async def move_foot_rest_to(self, position: float):
-        pass
+        self.stop_actions = False
+        while abs(self.feet_position - position) > 1.5 or self.stop_actions is False:
+            self.logger.warning(
+                "Current foot position: %s - Moving to: %s",
+                self.feet_position,
+                position,
+            )
+            if self.feet_position < position:
+                await self._foot_up()
+            else:
+                await self._foot_down()
 
-    def stop(self):
-        pass
+    async def stop(self):
+        self.stop_actions = True
+
+    async def _schedule_disconnect(self):
+        try:
+            await asyncio.sleep(20)
+            await self._disconnect_bed()
+        except asyncio.CancelledError:
+            self.logger.info("Bed disconnect task was canceled.")
+
 
     async def _move_head_to(self, position):
-        while abs(self.head_position - position) > 1.5:
+        self.stop_actions = False
+        while abs(self.head_position - position) > 1.5 or self.stop_actions is False:
             self.logger.warning(
                 "Current head position: %s - Moving to: %s",
                 self.head_position,
@@ -127,6 +157,36 @@ class Bed:
         # Update state
         self.head_position = max(0, self.head_position - self.head_increment)
         self.head_position = round(self.head_position, 2)
+
+    async def _foot_up(self):
+        """Move the foot section of the bed up."""
+        await self._write_char(_COMMAND_FOOT_UP)
+
+        # Update state
+        self.feet_position = min(100, self.feet_position + self.feet_increment)
+        self.feet_position = round(self.feet_position, 2)
+
+    async def _foot_down(self):
+        """Move the foot section of the bed down."""
+        await self._write_char(_COMMAND_FOOT_DOWN)
+
+        # Update state
+        self.feet_position = max(0, self.feet_position - self.fee)
+        self.feet_position = round(self.feet_position, 2)
+
+    async def _disconnect_bed(self):
+        if self.client is None:
+            self.logger.warning("BLE device not found, skipping disconnect.")
+            return
+
+        if self.client.is_connected:
+            self.logger.warning("Disconnecting from bed.")
+            await self.client.disconnect()
+            self.is_connected = False
+            self.logger.warning("Disconnected from bed.")
+        else:
+            self.logger.warning("Not connected, skipping disconnect.")
+
 
     async def _connect_bed(self):
         if self.client is None:

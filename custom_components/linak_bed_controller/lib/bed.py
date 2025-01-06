@@ -44,6 +44,7 @@ class Bed:
     def __init__(self, mac_address: str, device_name: str, logger: Logger):
         self.mac_address = mac_address
         self.device_name = device_name
+        self._disconnect_task = None
         self.logger = logger  # logging.getLogger(__name__)
 
         self.head_increment = (

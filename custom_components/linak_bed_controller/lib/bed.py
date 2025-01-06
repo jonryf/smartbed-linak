@@ -109,7 +109,9 @@ class Bed:
 
     async def move_foot_rest_to(self, position: float):
         self.stop_actions = False
-        while abs(self.feet_position - position) > 1.5 or self.stop_actions is False:
+        while abs(self.feet_position - position) > 1.5:
+            if self.stop_actions:
+                break
             self.logger.warning(
                 "Current foot position: %s - Moving to: %s",
                 self.feet_position,
@@ -133,7 +135,9 @@ class Bed:
 
     async def _move_head_to(self, position):
         self.stop_actions = False
-        while abs(self.head_position - position) > 1.5 or self.stop_actions is False:
+        while abs(self.head_position - position) > 1.5:
+            if self.stop_actions:
+                break
             self.logger.warning(
                 "Current head position: %s - Moving to: %s",
                 self.head_position,
@@ -173,7 +177,7 @@ class Bed:
         await self._write_char(_COMMAND_FOOT_DOWN)
 
         # Update state
-        self.feet_position = max(0, self.feet_position - self.fee)
+        self.feet_position = max(0, self.feet_position - self.feet_increment)
         self.feet_position = round(self.feet_position, 2)
 
     async def _disconnect_bed(self):

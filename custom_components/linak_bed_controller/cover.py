@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from bleak.exc import BleakError
 
@@ -69,7 +69,7 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return True  # super().available and self._bed.is_connected is True
+        return super().available
 
     @property
     def is_closed(self) -> bool:
@@ -112,6 +112,11 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         self._attr_current_cover_position = self._bed.head_position
         self.async_write_ha_state()
 
+    @property
+    def current_cover_position(self) -> int | None:
+        """Position of the cover."""
+        return int(self._bed.head_position)
+
 
 class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
     """Representation of Bed device."""
@@ -144,7 +149,7 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return True  # super().available and self._bed.is_connected is True
+        return super().available
 
     @property
     def is_closed(self) -> bool:
@@ -184,5 +189,5 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
     @callback
     def _handle_coordinator_update(self, *args: Any) -> None:
         """Handle data update."""
-        self._attr_current_cover_position = self._bed.head_position
+        self._attr_current_cover_position = self._bed.feet_position
         self.async_write_ha_state()

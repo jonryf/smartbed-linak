@@ -55,6 +55,7 @@ class Bed:
         # "State" - assume bed is in flat position on boot
         self.head_position = 0
         self.feet_position = 0
+        self.stop_actions = False
         self.light_status = False
         self.client = None
 

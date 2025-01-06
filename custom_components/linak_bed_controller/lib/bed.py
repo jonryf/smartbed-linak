@@ -43,7 +43,7 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
 
         self.head_increment = (
-            100 / 85
+            100 / 100
         )  # Number of commands required to go from 0% to 100%
         self.feet_increment = 100 / 60
 
@@ -54,7 +54,7 @@ class Bed:
         self.client = None
 
     async def set_ble_device(self, client):
-        self.logger.warning("Connectin to bed; %s", self.mac_address)
+        self.logger.warning("Connecting to bed; %s", self.mac_address)
         self.client = BleakClient(address_or_ble_device=self.mac_address)
         await self.client.connect()
 

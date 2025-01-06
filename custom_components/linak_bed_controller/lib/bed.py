@@ -38,6 +38,7 @@ class Bed:
     last_time_used: int = 0
     stop_actions: bool = False
     _lock = asyncio.Lock()
+    _disconnect_task = None
 
 
     def __init__(self, mac_address: str, device_name: str, logger: Logger):

@@ -50,7 +50,7 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
         self.hass = hass
         self.head_increment = (
-            100 / 120
+            100 / 100
         )  # Number of commands required to go from 0% to 100%
         self.feet_increment = 100 / 80
 
@@ -135,7 +135,7 @@ class Bed:
 
     async def _schedule_disconnect(self):
         try:
-            await asyncio.sleep(20)
+            await asyncio.sleep(40)
             await self._disconnect_bed()
         except asyncio.CancelledError:
             self.logger.info("Bed disconnect task was canceled.")

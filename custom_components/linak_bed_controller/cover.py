@@ -11,6 +11,7 @@ from homeassistant.components.cover import (
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
+    CoverState
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -80,6 +81,7 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         """Close the cover."""
         try:
             await self._bed.set_flat_head()
+            self._update_state(CoverState.CLOSED)
         except BleakError as err:
             raise HomeAssistantError("Failed to move down: Bluetooth error") from err
 
@@ -87,6 +89,7 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         """Open the cover."""
         try:
             await self._bed.set_max_head()
+            self._update_state(CoverState.OPEN)
         except BleakError as err:
             raise HomeAssistantError("Failed to move up: Bluetooth error") from err
 
@@ -97,10 +100,31 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         except BleakError as err:
             raise HomeAssistantError("Failed to stop moving: Bluetooth error") from err
 
+    @callback
+    def _update_state(self, state: str | None) -> None:
+        """Update the cover state."""
+        if state is None:
+            # Reset the state to `unknown`
+            self._attr_is_closed = None
+        else:
+            self._attr_is_closed = state == CoverState.CLOSED
+        self._attr_is_opening = state == CoverState.OPENING
+        self._attr_is_closing = state == CoverState.CLOSING
+
+
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover shutter to a specific position."""
         try:
-            await self._bed.move_head_rest_to(int(kwargs[ATTR_POSITION]))
+            position_percentage = int(kwargs[ATTR_POSITION])
+            self._update_state(
+                CoverState.CLOSED
+                if position_percentage <= 100
+                else CoverState.OPEN
+            )
+            await self._bed.move_head_rest_to(position_percentage)
+
+            self._attr_current_cover_position = position_percentage
+            self.async_write_ha_state()
         except BleakError as err:
             raise HomeAssistantError(
                 "Failed to move to specified position: Bluetooth error"
@@ -144,7 +168,19 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         self._attr_unique_id = address + "_foot"
         self._attr_device_info = device_info
 
-        self._attr_current_cover_position = self._bed.head_position
+        self._attr_current_cover_position = self._bed.feet_position
+
+    @callback
+    def _update_state(self, state: str | None) -> None:
+        """Update the cover state."""
+        if state is None:
+            # Reset the state to `unknown`
+            self._attr_is_closed = None
+        else:
+            self._attr_is_closed = state == CoverState.CLOSED
+        self._attr_is_opening = state == CoverState.OPENING
+        self._attr_is_closing = state == CoverState.CLOSING
+
 
     @property
     def available(self) -> bool:
@@ -160,6 +196,7 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         """Close the cover."""
         try:
             await self._bed.set_flat_foot()
+            self._update_state(CoverState.CLOSED)
         except BleakError as err:
             raise HomeAssistantError("Failed to move down: Bluetooth error") from err
 
@@ -167,6 +204,7 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         """Open the cover."""
         try:
             await self._bed.set_max_foot()
+            self._update_state(CoverState.OPEN)
         except BleakError as err:
             raise HomeAssistantError("Failed to move up: Bluetooth error") from err
 
@@ -180,7 +218,15 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the cover shutter to a specific position."""
         try:
-            await self._bed.move_foot_rest_to(int(kwargs[ATTR_POSITION]))
+            position_percentage = int(kwargs[ATTR_POSITION])
+            self._update_state(
+                CoverState.CLOSED
+                if position_percentage <= 100
+                else CoverState.OPEN
+            )
+            await self._bed.move_foot_rest_to(position_percentage)
+            self._attr_current_cover_position = position_percentage
+            self.async_write_ha_state()
         except BleakError as err:
             raise HomeAssistantError(
                 "Failed to move to specified position: Bluetooth error"

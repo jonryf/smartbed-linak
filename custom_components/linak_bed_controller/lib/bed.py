@@ -48,9 +48,9 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
 
         self.head_increment = (
-            100 / 100
+            100 / 140
         )  # Number of commands required to go from 0% to 100%
-        self.feet_increment = 100 / 60
+        self.feet_increment = 100 / 120
 
         # "State" - assume bed is in flat position on boot
         self.head_position = 0

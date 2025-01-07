@@ -8,6 +8,7 @@ import time
 
 from bleak import BleakClient
 
+from homeassistant.components import bluetooth
 from homeassistant.helpers.entity_platform import Logger
 
 _UUID_COMMAND: str = "99fa0002-338a-1024-8a49-009c0215f78a"
@@ -39,14 +40,15 @@ class Bed:
     stop_actions: bool = False
     _lock = asyncio.Lock()
     _disconnect_task = None
+    hass = None
 
 
-    def __init__(self, mac_address: str, device_name: str, logger: Logger):
+    def __init__(self, mac_address: str, device_name: str, logger: Logger, hass):
         self.mac_address = mac_address
         self.device_name = device_name
         self._disconnect_task = None
         self.logger = logger  # logging.getLogger(__name__)
-
+        self.hass = hass
         self.head_increment = (
             100 / 120
         )  # Number of commands required to go from 0% to 100%
@@ -218,8 +220,11 @@ class Bed:
                     self.logger.warning("Failed to connect to bed after 6 attempts.")
                     break
                 self.logger.warning("Attempting to connect to bed.")
-                await self.client.connect()
+                ble_device = bluetooth.async_ble_device_from_address(
+                    self.hass, self.mac_address, connectable=True
+                )
                 self.logger.warning("Connected to bed.")
+                self.set_ble_device(ble_device)
                 self.is_connected = True
                 self.logger.warning("Connected to bed.")
                 # Schedule delayed_function to run after 20 seconds

@@ -28,7 +28,7 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
         self._address = address
         self._expected_connected = False
 
-        self.bed = Bed(self._address, name, _LOGGER)
+        self.bed = Bed(self._address, name, _LOGGER, hass)
 
     async def async_connect(self) -> bool:
         """Connect to desk."""

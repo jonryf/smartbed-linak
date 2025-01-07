@@ -221,7 +221,6 @@ class Bed:
                 await self.client.connect()
                 self.logger.warning("Connected to bed.")
                 self.is_connected = True
-                self._print_characteristics()
                 self.logger.warning("Connected to bed.")
                 # Schedule delayed_function to run after 20 seconds
                 timer = threading.Timer(20, self.disconnect_callback)
@@ -237,7 +236,9 @@ class Bed:
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
             return
-        self.logger.warning(f"Is connected: {self.client.is_connected}")
+        if not self.client.is_connected:
+            self.logger.warning("Not connected, skipping writing.")
+            return
         
         self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
         try:
@@ -279,14 +280,15 @@ class Bed:
     #     finally:
     #         self.write_in_progress = False
 
-    def _print_characteristics(self):
-        try:
-            for service in self.device.getServices():
-                for chara in service.getCharacteristics():
-                    self.logger.debug("Characteristic UUID: %s" % chara.uuid)
-                    self.logger.debug("Handle: 0x%04x" % chara.getHandle())
-                    properties = chara.propertiesToString()
-                    self.logger.debug("Properties: %s" % properties)
-                    self.logger.debug(f"{'-'*58}")
-        except Exception as e:
-            self.logger.error("Error accessing characteristic: %s" % str(e))
+#    def _print_characteristics(self):
+ #       pass
+        # try:
+        #     for service in self.device.getServices():
+        #         for chara in service.getCharacteristics():
+        #             self.logger.debug("Characteristic UUID: %s" % chara.uuid)
+        #             self.logger.debug("Handle: 0x%04x" % chara.getHandle())
+        #             properties = chara.propertiesToString()
+        #             self.logger.debug("Properties: %s" % properties)
+        #             self.logger.debug(f"{'-'*58}")
+        # except Exception as e:
+        #     self.logger.error("Error accessing characteristic: %s" % str(e))

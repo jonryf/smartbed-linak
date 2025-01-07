@@ -48,9 +48,9 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
 
         self.head_increment = (
-            100 / 540
+            100 / 200
         )  # Number of commands required to go from 0% to 100%
-        self.feet_increment = 100 / 520
+        self.feet_increment = 100 / 200
 
         # "State" - assume bed is in flat position on boot
         self.head_position = 0
@@ -200,11 +200,13 @@ class Bed:
             self.logger.warning("BLE device not found, skipping connecting.")
             return
         
-        if self.client:
-            return
-
+        attempts = 0
         while self.client.is_connected is False:
             try:
+                attempts += 1
+                if attempts > 6:
+                    self.logger.warning("Failed to connect to bed after 6 attempts.")
+                    break
                 self.logger.warning("Attempting to connect to bed.")
                 await self.client.connect()
                 self.logger.warning("Connected to bed.")
@@ -219,7 +221,7 @@ class Bed:
             except Exception as ex:
                 self.logger.warning("Error connecting to bed", ex)
             self.logger.warning("Error connecting to bed, retrying in one second.")
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
     async def _write_char(self, cmd: bytearray):
         if self.client is None:

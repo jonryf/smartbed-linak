@@ -232,7 +232,7 @@ class Bed:
             await self.client.write_gatt_char(
                 _UUID_COMMAND,
                 cmd,
-                response=False,
+                response=True,
             )
         except Exception as e:
             self.logger.error(str(e))

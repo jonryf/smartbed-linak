@@ -221,11 +221,12 @@ class Bed:
                     self.logger.warning("Failed to connect to bed after 6 attempts.")
                     break
                 self.logger.warning("Attempting to connect to bed.")
-                ble_device = bluetooth.async_ble_device_from_address(
+                await bluetooth.async_ble_device_from_address(
                     self.hass, self.mac_address, connectable=True
                 )
+                await self.client.connect()
                 self.logger.warning("Connected to bed.")
-                self.set_ble_device(ble_device)
+
                 self.is_connected = True
                 self.logger.warning("Connected to bed.")
                 # Schedule delayed_function to run after 20 seconds

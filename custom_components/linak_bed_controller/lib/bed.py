@@ -48,9 +48,9 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
 
         self.head_increment = (
-            100 / 200
+            100 / 120
         )  # Number of commands required to go from 0% to 100%
-        self.feet_increment = 100 / 200
+        self.feet_increment = 100 / 80
 
         # "State" - assume bed is in flat position on boot
         self.head_position = 0
@@ -110,7 +110,12 @@ class Bed:
 
     async def move_foot_rest_to(self, position: float):
         self.stop_actions = False
+        max_attempts = 500
         while abs(self.feet_position - position) > 1.5:
+            max_attempts -= 1
+            if max_attempts == 0:
+                self.logger.error("Failed to move foot to position.")
+                break
             if self.stop_actions:
                 break
             self.logger.warning(
@@ -136,7 +141,12 @@ class Bed:
 
     async def _move_head_to(self, position):
         self.stop_actions = False
+        max_attempts = 500
         while abs(self.head_position - position) > 1.5:
+            max_attempts -= 1
+            if max_attempts == 0:
+                self.logger.error("Failed to move head to position.")
+                break
             if self.stop_actions:
                 break
             self.logger.warning(

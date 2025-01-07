@@ -134,11 +134,12 @@ class Bed:
         self.stop_actions = True
 
     async def _schedule_disconnect(self):
-        try:
-            await asyncio.sleep(40)
-            await self._disconnect_bed()
-        except asyncio.CancelledError:
-            self.logger.info("Bed disconnect task was canceled.")
+        self.logger.info("Scheduling disconnect")
+        #try:
+           ## await asyncio.sleep(40)
+           # await self._disconnect_bed()
+        #except asyncio.CancelledError:
+        #    self.logger.info("Bed disconnect task was canceled.")
 
 
     async def _move_head_to(self, position):

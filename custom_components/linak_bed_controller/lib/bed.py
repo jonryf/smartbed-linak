@@ -63,15 +63,30 @@ class Bed:
 
     async def set_ble_device(self, client):
         self.logger.warning("Connecting to bed; %s", self.mac_address)
-        self.client = BleakClient(address_or_ble_device=self.mac_address)
-        await self.client.connect()
+        if self.client is not None:
+            self.logger.warning("Already connected to bed.")
+            await self.client.connect()
+        else:
+            self.client = BleakClient(address_or_ble_device=self.mac_address)
+            await self.client.connect()
 
 
     def set_flat(self):
         self.set_flat_head()
         self.set_flat_foot()
 
-    def disconnect_callback(self):
+    async def disconnect_callback(self):
+        if self.client is None:
+            self.logger.warning("Not connected, skipping disconnect.")
+            return
+        time_now = time.time()
+        if (time_now - self.last_time_used) > 4:
+            self.logger.info("Disconnecting from bed.")
+            await self.client.disconnect()
+            self.logger.info("Disconnected from bed.")
+            self.is_connected = False
+
+    async def disconnect_callback_sync(self):
         if self.client is None:
             self.logger.warning("Not connected, skipping disconnect.")
             return
@@ -221,16 +236,17 @@ class Bed:
                     self.logger.warning("Failed to connect to bed after 6 attempts.")
                     break
                 self.logger.warning("Attempting to connect to bed.")
-                await bluetooth.async_ble_device_from_address(
+                device = await bluetooth.async_ble_device_from_address(
                     self.hass, self.mac_address, connectable=True
                 )
+                #self.client = BleakClient(address_or_ble_device=self.mac_address)
                 await self.client.connect()
                 self.logger.warning("Connected to bed.")
 
                 self.is_connected = True
                 self.logger.warning("Connected to bed.")
                 # Schedule delayed_function to run after 20 seconds
-                timer = threading.Timer(20, self.disconnect_callback)
+                timer = threading.Timer(20, self.disconnect_callback_sync)
                 timer.start()
                 self.last_time_used = time.time()
                 return

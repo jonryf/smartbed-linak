@@ -80,10 +80,11 @@ class Bed:
             self.logger.warning("Not connected, skipping disconnect.")
             return
         time_now = time.time()
+        self.logger.warning("Disconnected from bed.", (time_now - self.last_time_used) > 4)
         if (time_now - self.last_time_used) > 4:
-            self.logger.info("Disconnecting from bed.")
+            self.logger.warning("Disconnecting from bed.")
             await self.client.disconnect()
-            self.logger.info("Disconnected from bed.")
+            self.logger.warning("Disconnected from bed.")
             self.is_connected = False
 
     async def disconnect_callback_sync(self):
@@ -91,10 +92,11 @@ class Bed:
             self.logger.warning("Not connected, skipping disconnect.")
             return
         time_now = time.time()
+        self.logger.warning("Disconnected from bed.", (time_now - self.last_time_used) > 4)
         if (time_now - self.last_time_used) > 4:
-            self.logger.info("Disconnecting from bed.")
+            self.logger.warning("Disconnecting from bed.")
             self.client.disconnect()
-            self.logger.info("Disconnected from bed.")
+            self.logger.warning("Disconnected from bed.")
             self.is_connected = False
 
     def set_max(self):

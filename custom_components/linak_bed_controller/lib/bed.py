@@ -246,9 +246,9 @@ class Bed:
                     break
                 
                 self.logger.warning("Attempting to connect to bed.")
-                # device = await bluetooth.async_ble_device_from_address(
-                #     self.hass, self.mac_address, connectable=True
-                # )
+                device = bluetooth.async_ble_device_from_address(
+                    self.hass, self.mac_address, connectable=True
+                )
                 #self.client = BleakClient(address_or_ble_device=self.mac_address)
                 async with self._lock:
                     if self._disconnect_task:

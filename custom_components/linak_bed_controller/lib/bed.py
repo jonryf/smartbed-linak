@@ -229,8 +229,6 @@ class Bed:
                         self._disconnect_task.cancel()
                     self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
 
-
-
             self.logger.warning("Skipping disconnect.", self.client.is_connected)
 
 
@@ -248,9 +246,9 @@ class Bed:
                     self.logger.warning("Failed to connect to bed after 6 attempts.")
                     break
                 self.logger.warning("Attempting to connect to bed.")
-                device = await bluetooth.async_ble_device_from_address(
-                    self.hass, self.mac_address, connectable=True
-                )
+                # device = await bluetooth.async_ble_device_from_address(
+                #     self.hass, self.mac_address, connectable=True
+                # )
                 #self.client = BleakClient(address_or_ble_device=self.mac_address)
                 async with self._lock:
                     if self._disconnect_task:

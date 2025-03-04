@@ -35,7 +35,6 @@ class Command(Enum):
 
 class Bed:
     client: BleakClient | None
-    is_connected: bool = False  # TODO: ...
     last_time_used: int = 0
     stop_actions: bool = False
     _lock = asyncio.Lock()
@@ -238,13 +237,14 @@ class Bed:
             return
         
         attempts = 0
-        self.logger.warning("Is connected: %s", self.client.is_connected is False)
+        self.logger.warning("Is connected: %s", self.client.is_connected)
         while self.client.is_connected is False:
             try:
                 attempts += 1
                 if attempts > 6:
                     self.logger.warning("Failed to connect to bed after 6 attempts.")
                     break
+                
                 self.logger.warning("Attempting to connect to bed.")
                 # device = await bluetooth.async_ble_device_from_address(
                 #     self.hass, self.mac_address, connectable=True

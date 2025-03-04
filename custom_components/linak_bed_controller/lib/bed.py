@@ -228,7 +228,7 @@ class Bed:
                         self._disconnect_task.cancel()
                     self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
 
-            self.logger.warning("Skipping disconnect.", self.client.is_connected)
+            self.logger.warning("Skipping disconnect. %s", self.client.is_connected)
 
 
     async def _connect_bed(self):

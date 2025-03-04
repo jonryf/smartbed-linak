@@ -238,7 +238,7 @@ class Bed:
         
         attempts = 0
         self.logger.warning("Is connected: %s", self.client.is_connected)
-        while self.client.is_connected is False:
+        while not self.client.is_connected:
             try:
                 attempts += 1
                 if attempts > 6:
@@ -262,7 +262,7 @@ class Bed:
                 self.last_time_used = time.time()
                 return
             except Exception as ex:
-                self.logger.warning("Error connecting to bed", ex)
+                self.logger.warning("Error connecting to bed: %s", ex)
             self.logger.warning("Error connecting to bed, retrying in one second.")
             await asyncio.sleep(5)
         self.last_time_used = time.time()

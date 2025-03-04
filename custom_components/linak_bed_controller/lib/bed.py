@@ -67,7 +67,7 @@ class Bed:
             await self._connect_bed()
 
         else:
-            self.client = BleakClient(address_or_ble_device=self.mac_address)
+            self.client = BleakClient(address_or_ble_device=self.mac_address, use_bonding=True)
             await self._connect_bed()
 
 

@@ -65,10 +65,12 @@ class Bed:
         self.logger.warning("Connecting to bed; %s", self.mac_address)
         if self.client is not None:
             self.logger.warning("Already connected to bed.")
-            await self.client.connect()
+            await self._connect_bed()
+
         else:
             self.client = BleakClient(address_or_ble_device=self.mac_address)
-            await self.client.connect()
+            await self._connect_bed()
+
 
 
     def set_flat(self):
@@ -85,7 +87,6 @@ class Bed:
             self.logger.warning("Disconnecting from bed.")
             await self.client.disconnect()
             self.logger.warning("Disconnected from bed.")
-            self.is_connected = False
 
     async def disconnect_callback_sync(self):
         if self.client is None:
@@ -97,7 +98,6 @@ class Bed:
             self.logger.warning("Disconnecting from bed.")
             self.client.disconnect()
             self.logger.warning("Disconnected from bed.")
-            self.is_connected = False
 
     def set_max(self):
         self.set_max_head()
@@ -116,20 +116,18 @@ class Bed:
         await self.move_foot_rest_to(100)
 
     async def move_head_rest_to(self, position: float):
-        self.logger.info("Move head rest to %s", position)
+        self.logger.warning("Move head rest to %s", position)
         await self._connect_bed()
         
-        async with self._lock:
-            if self._disconnect_task:
-                self._disconnect_task.cancel()
+        await self._move_head_to(position)
 
-            await self._move_head_to(position)
-            self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
 
 
     async def move_foot_rest_to(self, position: float):
         self.stop_actions = False
         max_attempts = 500
+        await self._connect_bed()
+
         while abs(self.feet_position - position) > 1.5:
             max_attempts -= 1
             if max_attempts == 0:
@@ -216,13 +214,24 @@ class Bed:
             self.logger.warning("BLE device not found, skipping disconnect.")
             return
 
-        if self.client.is_connected:
+        time_now = time.time()
+        if (time_now - self.last_time_used) > 4 and self.client.is_connected:
             self.logger.warning("Disconnecting from bed.")
             await self.client.disconnect()
-            self.is_connected = False
             self.logger.warning("Disconnected from bed.")
         else:
-            self.logger.warning("Not connected, skipping disconnect.")
+            if (time_now - self.last_time_used) < 4:
+                self.logger.warning("Not disconnecting, bed was used recently.")
+                
+
+                async with self._lock:
+                    if self._disconnect_task:
+                        self._disconnect_task.cancel()
+                    self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
+
+
+
+            self.logger.warning("Skipping disconnect.", self.client.is_connected)
 
 
     async def _connect_bed(self):
@@ -231,6 +240,7 @@ class Bed:
             return
         
         attempts = 0
+        self.logger.warning("Is connected: %s", self.client.is_connected is False)
         while self.client.is_connected is False:
             try:
                 attempts += 1
@@ -242,20 +252,23 @@ class Bed:
                     self.hass, self.mac_address, connectable=True
                 )
                 #self.client = BleakClient(address_or_ble_device=self.mac_address)
-                await self.client.connect()
-                self.logger.warning("Connected to bed.")
-
-                self.is_connected = True
-                self.logger.warning("Connected to bed.")
-                # Schedule delayed_function to run after 20 seconds
-                timer = threading.Timer(20, self.disconnect_callback_sync)
-                timer.start()
+                async with self._lock:
+                    if self._disconnect_task:
+                        self._disconnect_task.cancel()
+                    self.logger.warning("Connected to bed.")
+                    await self.client.connect()
+                    self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
+                    self.logger.warning("Connected.")
+ 
+               
                 self.last_time_used = time.time()
                 return
             except Exception as ex:
                 self.logger.warning("Error connecting to bed", ex)
             self.logger.warning("Error connecting to bed, retrying in one second.")
             await asyncio.sleep(5)
+        self.last_time_used = time.time()
+
 
     async def _write_char(self, cmd: bytearray):
         if self.client is None:

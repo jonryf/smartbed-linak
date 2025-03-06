@@ -255,6 +255,22 @@ class Bed:
                         self._disconnect_task.cancel()
                     self.logger.warning("Connected to bed.")
                     await self.client.connect()
+
+                    # wait for gatt authorisation   
+                    gatt_attempts = 0                 
+                    while gatt_attempts < 10:
+                        try:
+                            gatt_attempts += 1
+                            
+                            services = await self.client.get_services()
+                            self.logger.warning("Services retrieved successfully")
+                            for service in services:
+                                self.logger.warning(service)
+       
+                        except Exception as ex:
+                            self.logger.warning("No auth: %s", ex)
+                            await asyncio.sleep(1)
+                        
                     self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
                     self.logger.warning("Connected.")
  
@@ -269,6 +285,8 @@ class Bed:
 
 
     async def _write_char(self, cmd: bytearray):
+        self.last_time_used = time.time()
+
         if self.client is None:
             self.logger.warning("BLE device not found, skipping writing.")
             return

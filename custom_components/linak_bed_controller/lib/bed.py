@@ -41,6 +41,11 @@ class Bed:
     _disconnect_task = None
     hass = None
 
+    moving_foot_active: bool = False
+    moving_head_active: bool = False
+    moving_head_to_position: 0
+    moving_foot_to_position: 0
+
 
     def __init__(self, mac_address: str, device_name: str, logger: Logger, hass):
         self.mac_address = mac_address
@@ -116,33 +121,58 @@ class Bed:
 
     async def move_head_rest_to(self, position: float):
         self.logger.warning("Move head rest to %s", position)
-        await self._connect_bed()
+        self.moving_head_to_position = position
         
-        await self._move_head_to(position)
+        await self._connect_bed()
+        if self.moving_head_active:
+            self.logger.warning("Head movement already in progress.")
+            return
+        
+        try:
+            self.moving_head_active = True
+            await self._move_head_to()
+        except Exception as ex:
+            self.logger.error("Error moving head to position: %s", ex)
+        finally:
+            self.moving_head_active = False
 
 
 
     async def move_foot_rest_to(self, position: float):
-        self.stop_actions = False
-        max_attempts = 500
-        await self._connect_bed()
+        self.moving_foot_to_position = position
+        if self.moving_foot_active:
+            self.logger.warning("Foot movement already in progress.")
+            return
 
-        while abs(self.feet_position - position) > 1.5:
-            max_attempts -= 1
-            if max_attempts == 0:
-                self.logger.error("Failed to move foot to position.")
-                break
-            if self.stop_actions:
-                break
-            self.logger.warning(
-                "Current foot position: %s - Moving to: %s",
-                self.feet_position,
-                position,
-            )
-            if self.feet_position < position:
-                await self._foot_up()
-            else:
-                await self._foot_down()
+        try: 
+            self.moving_foot_active = True
+
+            self.stop_actions = False
+            max_attempts = 500
+
+
+            await self._connect_bed()
+
+            while abs(self.feet_position - self.moving_foot_to_position) > 1.5:
+                max_attempts -= 1
+                if max_attempts == 0:
+                    self.logger.error("Failed to move foot to position.")
+                    break
+                if self.stop_actions:
+                    break
+                self.logger.warning(
+                    "Current foot position: %s - Moving to: %s",
+                    self.feet_position,
+                    self.moving_foot_to_position,
+                )
+                if self.feet_position < self.moving_foot_to_position:
+                    await self._foot_up()
+                else:
+                    await self._foot_down()
+        except Exception as ex:
+            self.logger.error("Error moving foot to position: %s", ex)
+        finally:
+            self.moving_foot_active = False
 
     async def stop(self):
         self.stop_actions = True
@@ -156,10 +186,11 @@ class Bed:
            self.logger.info("Bed disconnect task was canceled.")
 
 
-    async def _move_head_to(self, position):
+    async def _move_head_to(self):
         self.stop_actions = False
         max_attempts = 500
-        while abs(self.head_position - position) > 1.5:
+
+        while abs(self.head_position - self.moving_head_to_position) > 1.5:
             max_attempts -= 1
             if max_attempts == 0:
                 self.logger.error("Failed to move head to position.")
@@ -169,9 +200,9 @@ class Bed:
             self.logger.warning(
                 "Current head position: %s - Moving to: %s",
                 self.head_position,
-                position,
+                self.moving_head_to_position,
             )
-            if self.head_position < position:
+            if self.head_position < self.moving_head_to_position:
                 await self._head_up()
             else:
                 await self._head_down()
@@ -179,6 +210,8 @@ class Bed:
     async def _move_to_flat(self):
         self.stop_actions = False
         max_attempts = 500
+        self.head_position += 50
+        self.feet_position += 50
         while abs(self.head_position) > 1.5 or abs(self.feet_position) > 1.5:
             max_attempts -= 1
             if max_attempts == 0:
@@ -297,6 +330,8 @@ class Bed:
                         
                     self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
                     self.logger.warning("Connected.")
+                    await asyncio.sleep(1.5)
+
  
                
                 self.last_time_used = time.time()

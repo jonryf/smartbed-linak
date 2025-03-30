@@ -50,7 +50,7 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         | CoverEntityFeature.SET_POSITION
     )
     _attr_has_entity_name = True
-    _attr_name = None
+    _attr_name = "Bed Head Rest"
     _attr_translation_key = "bed_head_rest"
 
     def __init__(
@@ -153,7 +153,7 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         | CoverEntityFeature.SET_POSITION
     )
     _attr_has_entity_name = True
-    _attr_name = None
+    _attr_name = "Bed Foot Rest"
     _attr_translation_key = "bed_foot_rest"
 
     def __init__(

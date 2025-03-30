@@ -49,9 +49,9 @@ class Bed:
         self.logger = logger  # logging.getLogger(__name__)
         self.hass = hass
         self.head_increment = (
-            100 / 100
+            100 / 130
         )  # Number of commands required to go from 0% to 100%
-        self.feet_increment = 100 / 80
+        self.feet_increment = 100 / 95
 
         # "State" - assume bed is in flat position on boot
         self.head_position = 0
@@ -70,11 +70,11 @@ class Bed:
             self.client = BleakClient(address_or_ble_device=self.mac_address, use_bonding=True)
             await self._connect_bed()
 
-
-
-    def set_flat(self):
-        self.set_flat_head()
-        self.set_flat_foot()
+    async def set_flat(self):
+        self.logger.warning("Move bed to flat position.")
+        await self._connect_bed()
+        
+        await self._move_to_flat()
 
     async def disconnect_callback(self):
         if self.client is None:
@@ -176,6 +176,20 @@ class Bed:
             else:
                 await self._head_down()
 
+    async def _move_to_flat(self):
+        self.stop_actions = False
+        max_attempts = 500
+        while abs(self.head_position) > 1.5 or abs(self.feet_position) > 1.5:
+            max_attempts -= 1
+            if max_attempts == 0:
+                self.logger.error("Failed to move head to position.")
+                break
+            if self.stop_actions:
+                break
+            self.logger.warning("Moving bed down position")                
+            await self._all_down()
+
+
     async def _head_up(self):
         """Move the head section of the bed up."""
         await self._write_char(_COMMAND_HEAD_UP)
@@ -183,6 +197,16 @@ class Bed:
         # Update state
         self.head_position = min(100, self.head_position + self.head_increment)
         self.head_position = round(self.head_position, 2)
+
+    async def _all_down(self):
+        """Move the head section of the bed up."""
+        await self._write_char(_COMMAND_ALL_DOWN)
+
+        # Update state
+        self.head_position = max(0, self.head_position - self.head_increment)
+        self.head_position = round(self.head_position, 2)
+        self.feet_position = max(0, self.feet_position - self.feet_increment)
+        self.feet_position = round(self.feet_position, 2)
 
     async def _head_down(self):
         """Move the head section of the bed down."""
@@ -301,6 +325,7 @@ class Bed:
                 cmd,
                 response=True,
             )
+            await asyncio.sleep(0.1)
         except Exception as e:
             self.logger.error(str(e))
         self.logger.debug("Command sent successfully.")

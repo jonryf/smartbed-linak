@@ -54,7 +54,7 @@ class BedFlatButton(CoordinatorEntity[BedCoordinator], ButtonEntity):
         entity_description: LinakBedButtonDescription,
     ) -> None:
         """Initialize the IdasenDesk button entity."""
-        super().__init__(f"{entity_description.key}-{coordinator.address}", coordinator)
+        super().__init__(coordinator)
         self.entity_description = entity_description
         self._bed = coordinator.bed
 

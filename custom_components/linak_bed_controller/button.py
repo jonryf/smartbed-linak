@@ -40,7 +40,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the cover platform for the bed."""
     data: BedData = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([BedFlatButton( data.coordinator, description)] for description in CONSUMABLE_BUTTON_DESCRIPTIONS)
+    async_add_entities(BedFlatButton( data.coordinator, CONSUMABLE_BUTTON_DESCRIPTIONS[0]))
 
 
 class BedFlatButton(CoordinatorEntity[BedCoordinator], ButtonEntity):

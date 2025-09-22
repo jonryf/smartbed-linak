@@ -11,5 +11,3 @@ POST_CONNECTION_DELAY = 0.3  # seconds (reduced from 1.5)
 
 # ESP32 Bluetooth proxy optimizations
 ESP32_MTU_SIZE = 185  # Optimal MTU for ESP32
-ESP32_CONNECTION_INTERVAL_MIN = 7.5  # ms
-ESP32_CONNECTION_INTERVAL_MAX = 15  # ms

@@ -55,10 +55,10 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
             return False
 
     async def async_disconnect(self) -> None:
-        """Disconnect from desk."""
+        """Disconnect from bed."""
         self._expected_connected = False
         _LOGGER.debug("Disconnecting from %s", self._address)
-        await self.bed.disconnect_callback()
+        await self.bed.async_cleanup()
 
     async def async_connect_if_expected(self) -> None:
         """Ensure that the desk is connected if that is the expected state."""

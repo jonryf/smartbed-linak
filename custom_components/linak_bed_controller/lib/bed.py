@@ -75,16 +75,20 @@ class Bed:
         self.client = None
         self._ble_device = None  # Cache BLE device to avoid repeated lookups
         self._services_discovered = False  # Track service discovery state
+    
+    async def async_cleanup(self):
+        """Cleanup method to be called when the bed is no longer needed."""
+        self.logger.info("Cleaning up bed resources: %s", self.mac_address)
+        await self._cleanup_and_disconnect()
 
     async def set_ble_device(self, ble_device):
         self.logger.warning("Setting BLE device for bed: %s", self.mac_address)
         self._ble_device = ble_device
         
+        # Clean up existing client properly
         if self.client is not None:
-            self.logger.warning("Already have client, updating device.")
-            # Disconnect existing client if connected
-            if self.client.is_connected:
-                await self.client.disconnect()
+            self.logger.warning("Already have client, cleaning up before updating device.")
+            await self._cleanup_and_disconnect()
         
         # Create new client with optimized settings for ESP32 proxies
         self.client = BleakClient(
@@ -101,26 +105,42 @@ class Bed:
         await self._move_to_flat()
 
     async def disconnect_callback(self):
-        if self.client is None:
-            self.logger.warning("Not connected, skipping disconnect.")
-            return
-        time_now = time.time()
-        self.logger.warning("Disconnected from bed.", (time_now - self.last_time_used) > 4)
-        if (time_now - self.last_time_used) > 4:
-            self.logger.warning("Disconnecting from bed.")
-            await self.client.disconnect()
-            self.logger.warning("Disconnected from bed.")
+        """Force immediate disconnect and cleanup."""
+        await self._cleanup_and_disconnect()
 
-    async def disconnect_callback_sync(self):
-        if self.client is None:
-            self.logger.warning("Not connected, skipping disconnect.")
-            return
-        time_now = time.time()
-        self.logger.warning("Disconnected from bed.", (time_now - self.last_time_used) > 4)
-        if (time_now - self.last_time_used) > 4:
-            self.logger.warning("Disconnecting from bed.")
-            self.client.disconnect()
-            self.logger.warning("Disconnected from bed.")
+    async def _cleanup_and_disconnect(self):
+        """Clean up all resources and disconnect properly."""
+        async with self._lock:
+            # Cancel any pending disconnect task
+            if self._disconnect_task:
+                self._disconnect_task.cancel()
+                try:
+                    await self._disconnect_task
+                except asyncio.CancelledError:
+                    pass
+                self._disconnect_task = None
+            
+            # Disconnect client if connected
+            if self.client is not None and self.client.is_connected:
+                try:
+                    self.logger.info("Disconnecting from bed: %s", self.mac_address)
+                    
+                    # Stop any active notifications first
+                    try:
+                        await self.client.stop_notify("99fa0011-338a-1024-8a49-009c0215f78a")  # DPG characteristic
+                    except Exception:
+                        pass  # Ignore errors if not subscribed
+                    
+                    await self.client.disconnect()
+                    self.logger.info("Successfully disconnected from bed: %s", self.mac_address)
+                except Exception as ex:
+                    self.logger.warning("Error during disconnect: %s", ex)
+            
+            # Reset connection state
+            self._services_discovered = False
+            
+            # Clear any remaining references
+            self._ble_device = None
 
     def set_max(self):
         self.set_max_head()
@@ -285,26 +305,22 @@ class Bed:
         self.feet_position = round(self.feet_position, 2)
 
     async def _disconnect_bed(self):
+        """Internal disconnect method used by scheduled disconnect."""
         if self.client is None:
-            self.logger.warning("BLE device not found, skipping disconnect.")
+            self.logger.debug("BLE client not initialized, skipping disconnect.")
             return
 
         time_now = time.time()
-        if (time_now - self.last_time_used) > 4 and self.client.is_connected:
-            self.logger.warning("Disconnecting from bed.")
-            await self.client.disconnect()
-            self.logger.warning("Disconnected from bed.")
+        if (time_now - self.last_time_used) > 4:
+            # Enough time has passed, safe to disconnect
+            await self._cleanup_and_disconnect()
         else:
-            if (time_now - self.last_time_used) < 4:
-                self.logger.warning("Not disconnecting, bed was used recently.")
-                
-
-                async with self._lock:
-                    if self._disconnect_task:
-                        self._disconnect_task.cancel()
-                    self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
-
-            self.logger.warning("Skipping disconnect. %s", self.client.is_connected)
+            # Still being used recently, reschedule disconnect
+            self.logger.debug("Not disconnecting, bed was used recently.")
+            async with self._lock:
+                if self._disconnect_task:
+                    self._disconnect_task.cancel()
+                self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
 
 
     async def _connect_bed(self):

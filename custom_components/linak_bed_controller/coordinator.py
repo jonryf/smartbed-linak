@@ -31,20 +31,28 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
         self.bed = Bed(self._address, name, _LOGGER, hass)
 
     async def async_connect(self) -> bool:
-        """Connect to desk."""
-        _LOGGER.warning("Trying to connect %s", self._address)
+        """Connect to bed."""
+        _LOGGER.info("Attempting to connect to bed: %s", self._address)
         self._expected_connected = True
+        
+        # Get fresh BLE device from Home Assistant's Bluetooth integration
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self._address, connectable=True
         )
         if ble_device is None:
-            _LOGGER.warning("No BLEDevice for %s", self._address)
+            _LOGGER.warning("No BLE device found for address: %s", self._address)
             return False
-        _LOGGER.warning("Connected (!) to %s", self._address)
-
-        await self.bed.set_ble_device(ble_device)
-
-        return True
+        
+        _LOGGER.debug("BLE device found, initiating connection...")
+        
+        try:
+            await self.bed.set_ble_device(ble_device)
+            _LOGGER.info("Successfully connected to bed: %s", self._address)
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to connect to bed %s: %s", self._address, ex)
+            self._expected_connected = False
+            return False
 
     async def async_disconnect(self) -> None:
         """Disconnect from desk."""

@@ -7,9 +7,18 @@ import threading
 import time
 
 from bleak import BleakClient
+from bleak.exc import BleakError, BleakDBusError
 
 from homeassistant.components import bluetooth
 from homeassistant.helpers.entity_platform import Logger
+from ..const import (
+    CONNECTION_TIMEOUT,
+    CONNECTION_RETRY_DELAY,
+    MAX_CONNECTION_ATTEMPTS,
+    GATT_AUTH_TIMEOUT,
+    POST_CONNECTION_DELAY,
+    ESP32_MTU_SIZE,
+)
 
 _UUID_COMMAND: str = "99fa0002-338a-1024-8a49-009c0215f78a"
 
@@ -64,16 +73,26 @@ class Bed:
         self.stop_actions = False
         self.light_status = False
         self.client = None
+        self._ble_device = None  # Cache BLE device to avoid repeated lookups
+        self._services_discovered = False  # Track service discovery state
 
-    async def set_ble_device(self, client):
-        self.logger.warning("Connecting to bed; %s", self.mac_address)
+    async def set_ble_device(self, ble_device):
+        self.logger.warning("Setting BLE device for bed: %s", self.mac_address)
+        self._ble_device = ble_device
+        
         if self.client is not None:
-            self.logger.warning("Already connected to bed.")
-            await self._connect_bed()
-
-        else:
-            self.client = BleakClient(address_or_ble_device=self.mac_address, use_bonding=True)
-            await self._connect_bed()
+            self.logger.warning("Already have client, updating device.")
+            # Disconnect existing client if connected
+            if self.client.is_connected:
+                await self.client.disconnect()
+        
+        # Create new client with optimized settings for ESP32 proxies
+        self.client = BleakClient(
+            address_or_ble_device=ble_device,
+            timeout=CONNECTION_TIMEOUT,
+            use_bonding=True
+        )
+        await self._connect_bed()
 
     async def set_flat(self):
         self.logger.warning("Move bed to flat position.")
@@ -290,80 +309,144 @@ class Bed:
 
     async def _connect_bed(self):
         if self.client is None:
-            self.logger.warning("BLE device not found, skipping connecting.")
+            self.logger.warning("BLE client not initialized, skipping connection.")
+            return
+        
+        if self.client.is_connected:
+            self.logger.debug("Already connected to bed.")
+            self.last_time_used = time.time()
             return
         
         attempts = 0
-        self.logger.warning("Is connected: %s", self.client.is_connected)
-        while not self.client.is_connected:
+        self.logger.info("Attempting to connect to bed: %s", self.mac_address)
+        
+        while not self.client.is_connected and attempts < MAX_CONNECTION_ATTEMPTS:
             try:
                 attempts += 1
-                if attempts > 6:
-                    self.logger.warning("Failed to connect to bed after 6 attempts.")
-                    break
+                self.logger.info("Connection attempt %d/%d", attempts, MAX_CONNECTION_ATTEMPTS)
                 
-                self.logger.warning("Attempting to connect to bed.")
-                device = bluetooth.async_ble_device_from_address(
-                    self.hass, self.mac_address, connectable=True
-                )
-                #self.client = BleakClient(address_or_ble_device=self.mac_address)
                 async with self._lock:
+                    # Cancel any pending disconnect task
                     if self._disconnect_task:
                         self._disconnect_task.cancel()
-                    self.logger.warning("Connected to bed.")
-                    await self.client.connect()
-
-                    # wait for gatt authorisation   
-                    gatt_attempts = 0                 
-                    while gatt_attempts < 10:
+                        self._disconnect_task = None
+                    
+                    # Connect with timeout
+                    try:
+                        await asyncio.wait_for(
+                            self.client.connect(),
+                            timeout=CONNECTION_TIMEOUT
+                        )
+                        self.logger.info("Successfully connected to bed.")
+                    except asyncio.TimeoutError:
+                        self.logger.warning("Connection attempt %d timed out after %ds", attempts, CONNECTION_TIMEOUT)
+                        if attempts < MAX_CONNECTION_ATTEMPTS:
+                            await asyncio.sleep(CONNECTION_RETRY_DELAY)
+                            continue
+                        else:
+                            raise
+                    
+                    # Optimized GATT service discovery with timeout
+                    if not self._services_discovered:
                         try:
-                            gatt_attempts += 1
-                            
-                            services = await self.client.get_services()
-                            self.logger.warning("Services retrieved successfully")
-                            for service in services:
-                                self.logger.warning(service)
-       
+                            await asyncio.wait_for(
+                                self._discover_services(),
+                                timeout=GATT_AUTH_TIMEOUT
+                            )
+                            self._services_discovered = True
+                        except asyncio.TimeoutError:
+                            self.logger.warning("GATT service discovery timed out, but proceeding...")
                         except Exception as ex:
-                            self.logger.warning("No auth: %s", ex)
-                            await asyncio.sleep(1)
-                        
+                            self.logger.warning("GATT service discovery failed: %s, but proceeding...", ex)
+                    
+                    # Schedule automatic disconnect
                     self._disconnect_task = asyncio.create_task(self._schedule_disconnect())
-                    self.logger.warning("Connected.")
-                    await asyncio.sleep(1.5)
-
- 
-               
+                    
+                    # Minimal post-connection delay
+                    await asyncio.sleep(POST_CONNECTION_DELAY)
+                    
                 self.last_time_used = time.time()
                 return
+                
+            except (BleakError, BleakDBusError, OSError) as ex:
+                self.logger.warning("Connection attempt %d failed: %s", attempts, ex)
+                if attempts < MAX_CONNECTION_ATTEMPTS:
+                    await asyncio.sleep(CONNECTION_RETRY_DELAY)
+                else:
+                    self.logger.error("Failed to connect to bed after %d attempts", MAX_CONNECTION_ATTEMPTS)
+                    raise
             except Exception as ex:
-                self.logger.warning("Error connecting to bed: %s", ex)
-            self.logger.warning("Error connecting to bed, retrying in one second.")
-            await asyncio.sleep(5)
+                self.logger.error("Unexpected error during connection: %s", ex)
+                if attempts < MAX_CONNECTION_ATTEMPTS:
+                    await asyncio.sleep(CONNECTION_RETRY_DELAY)
+                else:
+                    raise
+        
         self.last_time_used = time.time()
 
 
+    async def _discover_services(self):
+        """Optimized service discovery for ESP32 proxies."""
+        try:
+            # Request MTU optimization for ESP32
+            if hasattr(self.client, 'request_mtu'):
+                try:
+                    await self.client.request_mtu(ESP32_MTU_SIZE)
+                    self.logger.debug("MTU optimized for ESP32 proxy")
+                except Exception as ex:
+                    self.logger.debug("MTU optimization failed (not critical): %s", ex)
+            
+            # Quick service discovery - just verify our command service exists
+            services = await self.client.get_services()
+            command_service_found = False
+            
+            for service in services:
+                if _UUID_COMMAND in [char.uuid for char in service.characteristics]:
+                    command_service_found = True
+                    self.logger.debug("Command service found")
+                    break
+            
+            if not command_service_found:
+                self.logger.warning("Command service not found, but proceeding...")
+            
+        except Exception as ex:
+            self.logger.warning("Service discovery error: %s", ex)
+            raise
+    
     async def _write_char(self, cmd: bytearray):
         self.last_time_used = time.time()
 
         if self.client is None:
-            self.logger.warning("BLE device not found, skipping writing.")
-            return
-        if not self.client.is_connected:
-            self.logger.warning("Not connected, skipping writing.")
+            self.logger.warning("BLE client not initialized, skipping write.")
             return
         
-        self.logger.debug(f"Attempting to transmit command bytes: {cmd}")
+        if not self.client.is_connected:
+            self.logger.warning("Not connected, attempting to reconnect...")
+            await self._connect_bed()
+            if not self.client.is_connected:
+                self.logger.error("Failed to reconnect, skipping write.")
+                return
+        
+        self.logger.debug(f"Transmitting command: {cmd.hex()}")
         try:
-            await self.client.write_gatt_char(
-                _UUID_COMMAND,
-                cmd,
-                response=True,
+            # Write with timeout to prevent hanging
+            await asyncio.wait_for(
+                self.client.write_gatt_char(
+                    _UUID_COMMAND,
+                    cmd,
+                    response=True,
+                ),
+                timeout=2.0
             )
-            await asyncio.sleep(0.1)
+            # Reduced delay for better responsiveness
+            await asyncio.sleep(0.05)
+            self.logger.debug("Command sent successfully.")
+        except asyncio.TimeoutError:
+            self.logger.error("Command write timed out")
+            raise
         except Exception as e:
-            self.logger.error(str(e))
-        self.logger.debug("Command sent successfully.")
+            self.logger.error("Command write failed: %s", e)
+            raise
 
     # def send_command(self, name):
     #     cmd = self.commands.get(name, None)

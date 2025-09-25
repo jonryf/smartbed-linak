@@ -8,6 +8,7 @@ import time
 
 from bleak import BleakClient
 from bleak.exc import BleakError, BleakDBusError
+from bleak_retry_connector import establish_connection
 
 from homeassistant.components import bluetooth
 from homeassistant.helpers.entity_platform import Logger
@@ -347,10 +348,14 @@ class Bed:
                         self._disconnect_task.cancel()
                         self._disconnect_task = None
                     
-                    # Connect with timeout
+                    # Connect with timeout using bleak-retry-connector for reliability
                     try:
                         await asyncio.wait_for(
-                            self.client.connect(),
+                            establish_connection(
+                                client=self.client,
+                                device=self._ble_device,
+                                name=self.device_name
+                            ),
                             timeout=CONNECTION_TIMEOUT
                         )
                         self.logger.info("Successfully connected to bed.")
@@ -413,7 +418,8 @@ class Bed:
                     self.logger.debug("MTU optimization failed (not critical): %s", ex)
             
             # Quick service discovery - just verify our command service exists
-            services = await self.client.get_services()
+            # Use the services property instead of get_services() method
+            services = self.client.services
             command_service_found = False
             
             for service in services:

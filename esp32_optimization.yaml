@@ -1,0 +1,58 @@
+# ESP32 Bluetooth Proxy Configuration for Linak Bed Controller
+# ⚠️  CRITICAL: This configuration ONLY works with ESP32 (NOT ESP8266)
+# ESP8266 does NOT have Bluetooth capability - you need ESP32 for Bluetooth proxy
+# IMPORTANT: Replace the values below with your actual device settings
+
+# Recommended ESP32 configuration for optimal Bluetooth performance
+esphome:
+  name: your-bluetooth-proxy-name  # Replace with your actual device name
+  friendly_name: Your Bluetooth Proxy  # Replace with your friendly name
+
+esp32:
+  board: esp32dev  # Perfect for ESP32 dev kit boards
+  framework:
+    type: esp-idf  # CRITICAL: Use ESP-IDF instead of Arduino for 3-5x better BLE performance
+    version: recommended
+
+# Disable web server to free up memory for Bluetooth operations
+# web_server:
+#   port: 80
+
+# Optimized WiFi configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # Enable fast connect for better performance
+  fast_connect: true
+  
+  # Power save mode can interfere with Bluetooth - disable it
+  power_save_mode: none
+
+# Bluetooth proxy configuration with ESP32 optimizations
+bluetooth_proxy:
+  active: true
+
+# Optimized BLE tracker settings for ESP32
+esp32_ble_tracker:
+  # For Ethernet-connected ESP32, set interval = window for best performance
+  # For WiFi-connected ESP32, use default values to maintain WiFi stability
+  scan_parameters:
+    # interval: 320ms  # Only uncomment if using Ethernet connection
+    # window: 320ms    # Only uncomment if using Ethernet connection
+    active: true
+
+# Enable logging to monitor connection performance
+logger:
+  level: INFO
+  logs:
+    esp32_ble_tracker: DEBUG
+    bluetooth_proxy: DEBUG
+
+# API for Home Assistant integration
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  password: !secret ota_password

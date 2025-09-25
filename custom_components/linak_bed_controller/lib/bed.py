@@ -8,7 +8,7 @@ import time
 
 from bleak import BleakClient
 from bleak.exc import BleakError, BleakDBusError
-from bleak_retry_connector import establish_connection
+from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 
 from homeassistant.components import bluetooth
 from homeassistant.helpers.entity_platform import Logger
@@ -352,9 +352,11 @@ class Bed:
                     try:
                         await asyncio.wait_for(
                             establish_connection(
+                                BleakClientWithServiceCache,
                                 client=self.client,
                                 device=self._ble_device,
-                                name=self.device_name
+                                name=self.device_name,
+                                max_attempts=3
                             ),
                             timeout=CONNECTION_TIMEOUT
                         )

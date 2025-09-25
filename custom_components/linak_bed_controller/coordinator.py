@@ -36,6 +36,13 @@ class BedCoordinator(DataUpdateCoordinator[int | None]):
         self._expected_connected = True
         
         # Get fresh BLE device from Home Assistant's Bluetooth integration
+        if self.bed.client is not None and self.bed.client.is_connected:
+            _LOGGER.debug("Already connected to bed, skipping connection...")
+            return True
+
+        elif self.bed.client is not None and not self.bed.client.is_connected:
+            _LOGGER.debug("Not connected to bed, attempting to connect...")
+
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, self._address, connectable=True
         )

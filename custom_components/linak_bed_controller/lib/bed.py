@@ -9,8 +9,9 @@ import time
 from bleak import BleakClient
 from bleak.exc import BleakError, BleakDBusError
 from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
-
+from bleak.backends.service import BleakGATTServiceCollection
 from homeassistant.components import bluetooth
+
 from homeassistant.helpers.entity_platform import Logger
 from ..const import (
     CONNECTION_TIMEOUT,
@@ -334,6 +335,12 @@ class Bed:
             self.last_time_used = time.time()
             return
         
+        if self._ble_device is None:
+            self.logger.warning("BLE device not initialized, skipping connection.")
+            self._ble_device = bluetooth.async_ble_device_from_address(
+                self.hass, self.mac_address, connectable=True
+            )
+
         attempts = 0
         self.logger.info("Attempting to connect to bed: %s", self.mac_address)
         
@@ -350,16 +357,19 @@ class Bed:
                     
                     # Connect with timeout using bleak-retry-connector for reliability
                     try:
-                        await asyncio.wait_for(
+                        self.logger.info("Connection to device %s", self._ble_device)
+                        self.client = await asyncio.wait_for(
                             establish_connection(
                                 BleakClientWithServiceCache,
-                                client=self.client,
                                 device=self._ble_device,
                                 name=self.device_name,
-                                max_attempts=3
+                                client=self.client,
+                                max_attempts=3,
+                                ble_device_callback=lambda: self._ble_device,
                             ),
                             timeout=CONNECTION_TIMEOUT
                         )
+           
                         self.logger.info("Successfully connected to bed.")
                     except asyncio.TimeoutError:
                         self.logger.warning("Connection attempt %d timed out after %ds", attempts, CONNECTION_TIMEOUT)

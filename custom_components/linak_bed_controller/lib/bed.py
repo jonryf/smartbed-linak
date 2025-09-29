@@ -473,7 +473,7 @@ class Bed:
                 timeout=2.0
             )
             # Reduced delay for better responsiveness
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.17)
             self.logger.debug("Command sent successfully.")
         except asyncio.TimeoutError:
             self.logger.error("Command write timed out")

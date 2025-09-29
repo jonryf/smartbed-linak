@@ -237,3 +237,8 @@ class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         """Handle data update."""
         self._attr_current_cover_position = self._bed.feet_position
         self.async_write_ha_state()
+
+    @property
+    def current_cover_position(self) -> int | None:
+        """Position of the cover."""
+        return int(self._bed.head_position)

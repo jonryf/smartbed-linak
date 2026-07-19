@@ -179,6 +179,8 @@ class LinakBed:
                 )
                 for motor in (self.head, self.foot):
                     await self._setup_motor(client, motor)
+                if not (self.head.has_feedback and self.foot.has_feedback):
+                    self._log_gatt_layout(client)
             except Exception:
                 # Any setup failure must release the control box's single BLE
                 # slot, or every future reconnect attempt is doomed.
@@ -216,6 +218,21 @@ class LinakBed:
         await client.start_notify(
             char, lambda _char, data, m=motor: self._handle_notification(m, data)
         )
+
+    def _log_gatt_layout(self, client: BleakClientWithServiceCache) -> None:
+        """Log the box's services/characteristics once, to aid protocol discovery.
+
+        Only called when the expected position characteristics are missing —
+        the dump shows whether this box exposes them under other UUIDs.
+        """
+        lines = [f"{self.name}: GATT layout (position feedback missing):"]
+        for service in client.services:
+            lines.append(f"  service {service.uuid}")
+            lines.extend(
+                f"    char {char.uuid} [{', '.join(char.properties)}]"
+                for char in service.characteristics
+            )
+        _LOGGER.warning("\n".join(lines))
 
     def _handle_disconnect(self, _client: BleakClientWithServiceCache) -> None:
         if self._expected_disconnect:

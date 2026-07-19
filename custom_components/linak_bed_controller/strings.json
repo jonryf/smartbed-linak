@@ -1,21 +1,35 @@
 {
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
+        "title": "Add Linak bed",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "address": "Device",
+          "name": "Name"
+        }
+      },
+      "manual": {
+        "title": "Add Linak bed manually",
+        "description": "No control boxes are advertising right now (a connected box stops advertising). Enter the Bluetooth address manually.",
+        "data": {
+          "address": "Bluetooth address (AA:BB:CC:DD:EE:FF)",
+          "name": "Name"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "Add Linak bed",
+        "description": "Do you want to add {name} to Home Assistant?",
+        "data": {
+          "name": "Name"
         }
       }
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "invalid_address": "Enter a valid Bluetooth address, e.g. AA:BB:CC:DD:EE:FF"
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "Device is already configured"
     }
   }
 }

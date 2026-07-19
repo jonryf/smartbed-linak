@@ -1,72 +1,39 @@
-"""Representation of Idasen Desk buttons."""
+"""Button entities for the bed."""
 
-from dataclasses import dataclass
-import logging
+from __future__ import annotations
+
 from bleak.exc import BleakError
 
-from .const import DOMAIN
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BedCoordinator, BedData
-
-_LOGGER = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, kw_only=True)
-class LinakBedButtonDescription(ButtonEntityDescription):
-    """Describes a Linak Bed button entity."""
-    command: str
-
-
-CONSUMABLE_BUTTON_DESCRIPTIONS = [
-    LinakBedButtonDescription(
-        key="set_flat",
-        name="Set Flat",
-        command="set_flat",
-    ),
-]
-
+from . import BedConfigEntry
+from .entity import BedEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BedConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the cover platform for the bed."""
-    data: BedData = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([BedFlatButton( data.coordinator, CONSUMABLE_BUTTON_DESCRIPTIONS[0])])
+    """Set up the button platform for the bed."""
+    async_add_entities([BedFlatButton(entry.runtime_data)])
 
 
-class BedFlatButton(CoordinatorEntity[BedCoordinator], ButtonEntity):
-    """Defines a Bed flat button."""
+class BedFlatButton(BedEntity, ButtonEntity):
+    """Move both sections to the flat position."""
 
-    entity_description: LinakBedButtonDescription
+    _attr_name = "Set Flat"
 
-    def __init__(
-        self,
-        coordinator: BedCoordinator,
-        entity_description: LinakBedButtonDescription,
-    ) -> None:
-        """Initialize the IdasenDesk button entity."""
-        super().__init__(coordinator)
-        self.entity_description = entity_description
-        self._bed = coordinator.bed
-
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "set_flat")
 
     async def async_press(self) -> None:
-        """Triggers the IdasenDesk button press service."""
+        if not await self.coordinator.async_ensure_connected():
+            raise HomeAssistantError(f"{self._bed.name} is not reachable")
         try:
-            await self._bed.set_flat()
+            await self._bed.move_to(head=0, foot=0)
         except BleakError as err:
-            raise HomeAssistantError("Failed to stop moving: Bluetooth error") from err
-
-    @property
-    def available(self) -> bool:
-        """Connect/disconnect buttons should always be available."""
-        return True
+            raise HomeAssistantError("Failed to move flat: Bluetooth error") from err

@@ -1,8 +1,8 @@
-"""Bed entities."""
+"""Cover entities for the head and foot rest of the bed."""
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from bleak.exc import BleakError
 
@@ -11,36 +11,32 @@ from homeassistant.components.cover import (
     CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
-    CoverState
 )
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import BedCoordinator, BedData
-from .const import DOMAIN
+from . import BedConfigEntry
+from .entity import BedEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BedConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the cover platform for the bed."""
-    data: BedData = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     async_add_entities(
         [
-            BedHeadRest(data.mac_address, data.device_info, data.coordinator),
-            BedFootRest(data.mac_address, data.device_info, data.coordinator),
+            BedSectionCover(coordinator, "head", "Bed Head Rest"),
+            BedSectionCover(coordinator, "foot", "Bed Foot Rest"),
         ]
     )
 
 
-class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
-    """Representation of Bed device."""
+class BedSectionCover(BedEntity, CoverEntity):
+    """One motorized section (head or foot rest) of the bed."""
 
     _attr_device_class = CoverDeviceClass.DAMPER
     _attr_supported_features = (
@@ -49,196 +45,47 @@ class BedHeadRest(CoordinatorEntity[BedCoordinator], CoverEntity):
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_POSITION
     )
-    _attr_has_entity_name = True
-    _attr_name = "Bed Head Rest"
-    _attr_translation_key = "bed_head_rest"
 
-    def __init__(
-        self,
-        address: str,
-        device_info: DeviceInfo,
-        coordinator: BedCoordinator,
-    ) -> None:
-        """Initialize an Idasen Desk cover."""
-        super().__init__(coordinator)
-        self._bed = coordinator.bed
-        self._attr_unique_id = address + "_head"
-        self._attr_device_info = device_info
-
-        self._attr_current_cover_position = self._bed.head_position
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return super().available
-
-    @property
-    def is_closed(self) -> bool:
-        """Return if the cover is closed."""
-        return self.current_cover_position == 0
-
-    async def async_close_cover(self, **kwargs: Any) -> None:
-        """Close the cover."""
-        try:
-            await self._bed.set_flat_head()
-            self._update_state(CoverState.CLOSED)
-        except BleakError as err:
-            raise HomeAssistantError("Failed to move down: Bluetooth error") from err
-
-    async def async_open_cover(self, **kwargs: Any) -> None:
-        """Open the cover."""
-        try:
-            await self._bed.set_max_head()
-            self._update_state(CoverState.OPEN)
-        except BleakError as err:
-            raise HomeAssistantError("Failed to move up: Bluetooth error") from err
-
-    async def async_stop_cover(self, **kwargs: Any) -> None:
-        """Stop the cover."""
-        try:
-            await self._bed.stop()
-        except BleakError as err:
-            raise HomeAssistantError("Failed to stop moving: Bluetooth error") from err
-
-    @callback
-    def _update_state(self, state: str | None) -> None:
-        """Update the cover state."""
-        if state is None:
-            # Reset the state to `unknown`
-            self._attr_is_closed = None
-        else:
-            self._attr_is_closed = state == CoverState.CLOSED
-        self._attr_is_opening = state == CoverState.OPENING
-        self._attr_is_closing = state == CoverState.CLOSING
-
-
-    async def async_set_cover_position(self, **kwargs: Any) -> None:
-        """Move the cover shutter to a specific position."""
-        try:
-            position_percentage = int(kwargs[ATTR_POSITION])
-            self._update_state(
-                CoverState.CLOSED
-                if position_percentage <= 100
-                else CoverState.OPEN
-            )
-            await self._bed.move_head_rest_to(position_percentage)
-
-            self._attr_current_cover_position = position_percentage
-            self.async_write_ha_state()
-        except BleakError as err:
-            raise HomeAssistantError(
-                "Failed to move to specified position: Bluetooth error"
-            ) from err
-
-    @callback
-    def _handle_coordinator_update(self, *args: Any) -> None:
-        """Handle data update."""
-        self._attr_current_cover_position = self._bed.head_position
-        self.async_write_ha_state()
+    def __init__(self, coordinator, motor_name: str, name: str) -> None:
+        super().__init__(coordinator, motor_name)
+        self._motor_name = motor_name
+        self._motor = coordinator.bed.head if motor_name == "head" else coordinator.bed.foot
+        self._attr_name = name
 
     @property
     def current_cover_position(self) -> int | None:
-        """Position of the cover."""
-        return int(self._bed.head_position)
-
-
-class BedFootRest(CoordinatorEntity[BedCoordinator], CoverEntity):
-    """Representation of Bed device."""
-
-    _attr_device_class = CoverDeviceClass.DAMPER
-    _attr_supported_features = (
-        CoverEntityFeature.OPEN
-        | CoverEntityFeature.CLOSE
-        | CoverEntityFeature.STOP
-        | CoverEntityFeature.SET_POSITION
-    )
-    _attr_has_entity_name = True
-    _attr_name = "Bed Foot Rest"
-    _attr_translation_key = "bed_foot_rest"
-
-    def __init__(
-        self,
-        address: str,
-        device_info: DeviceInfo,
-        coordinator: BedCoordinator,
-    ) -> None:
-        """Initialize an Idasen Desk cover."""
-        super().__init__(coordinator)
-        self._bed = coordinator.bed
-        self._attr_unique_id = address + "_foot"
-        self._attr_device_info = device_info
-
-        self._attr_current_cover_position = self._bed.feet_position
-
-    @callback
-    def _update_state(self, state: str | None) -> None:
-        """Update the cover state."""
-        if state is None:
-            # Reset the state to `unknown`
-            self._attr_is_closed = None
-        else:
-            self._attr_is_closed = state == CoverState.CLOSED
-        self._attr_is_opening = state == CoverState.OPENING
-        self._attr_is_closing = state == CoverState.CLOSING
-
+        pct = self._motor.position_pct
+        return None if pct is None else round(pct)
 
     @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return super().available
+    def is_closed(self) -> bool | None:
+        position = self.current_cover_position
+        return None if position is None else position == 0
 
     @property
-    def is_closed(self) -> bool:
-        """Return if the cover is closed."""
-        return self.current_cover_position == 0
+    def is_opening(self) -> bool:
+        return self._motor.is_moving_up
 
-    async def async_close_cover(self, **kwargs: Any) -> None:
-        """Close the cover."""
-        try:
-            await self._bed.set_flat_foot()
-            self._update_state(CoverState.CLOSED)
-        except BleakError as err:
-            raise HomeAssistantError("Failed to move down: Bluetooth error") from err
+    @property
+    def is_closing(self) -> bool:
+        return self._motor.is_moving_down
 
     async def async_open_cover(self, **kwargs: Any) -> None:
-        """Open the cover."""
-        try:
-            await self._bed.set_max_foot()
-            self._update_state(CoverState.OPEN)
-        except BleakError as err:
-            raise HomeAssistantError("Failed to move up: Bluetooth error") from err
+        await self._move_to(100)
 
-    async def async_stop_cover(self, **kwargs: Any) -> None:
-        """Stop the cover."""
-        try:
-            await self._bed.stop()
-        except BleakError as err:
-            raise HomeAssistantError("Failed to stop moving: Bluetooth error") from err
+    async def async_close_cover(self, **kwargs: Any) -> None:
+        await self._move_to(0)
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
-        """Move the cover shutter to a specific position."""
+        await self._move_to(int(kwargs[ATTR_POSITION]))
+
+    async def async_stop_cover(self, **kwargs: Any) -> None:
+        await self._bed.stop(self._motor_name)
+
+    async def _move_to(self, position: int) -> None:
+        if not await self.coordinator.async_ensure_connected():
+            raise HomeAssistantError(f"{self._bed.name} is not reachable")
         try:
-            position_percentage = int(kwargs[ATTR_POSITION])
-            self._update_state(
-                CoverState.CLOSED
-                if position_percentage <= 100
-                else CoverState.OPEN
-            )
-            await self._bed.move_foot_rest_to(position_percentage)
-            self._attr_current_cover_position = position_percentage
-            self.async_write_ha_state()
+            await self._bed.move_to(**{self._motor_name: position})
         except BleakError as err:
-            raise HomeAssistantError(
-                "Failed to move to specified position: Bluetooth error"
-            ) from err
-
-    @callback
-    def _handle_coordinator_update(self, *args: Any) -> None:
-        """Handle data update."""
-        self._attr_current_cover_position = self._bed.feet_position
-        self.async_write_ha_state()
-
-    @property
-    def current_cover_position(self) -> int | None:
-        """Position of the cover."""
-        return int(self._bed.head_position)
+            raise HomeAssistantError("Failed to move: Bluetooth error") from err
